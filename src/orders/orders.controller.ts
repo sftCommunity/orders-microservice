@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { OrdersService } from './orders.service';
 
 @Controller()
 export class OrdersController {
@@ -18,7 +18,7 @@ export class OrdersController {
   }
 
   @MessagePattern({ cmd: 'find_one_order' })
-  findOne(@Payload() id: number) {
+  findOne(@Payload() id: string) {
     return this.ordersService.findOne(id);
   }
 }
