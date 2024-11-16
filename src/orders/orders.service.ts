@@ -29,15 +29,61 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
   }
 
   async create(createOrderDto: CreateOrderDto) {
-    const ids = [4, 5546];
-    const products = await firstValueFrom(
-      this.productsClient.send({ cmd: 'validate_products' }, ids),
-    );
+    try {
+      const productsIds = createOrderDto.items.map((item) => item.productId);
+      const products: any[] = await firstValueFrom(
+        this.productsClient.send({ cmd: 'validate_products' }, productsIds),
+      );
 
-    return {
-      service: 'orders microservice',
-      data: products,
-    };
+      const totalAmount = createOrderDto.items.reduce((acc, orderItem) => {
+        const price = products.find((p) => p.id === orderItem.productId)?.price;
+        return price * orderItem.quantity;
+      }, 0);
+
+      const totalItems = createOrderDto.items.reduce(
+        (acc, orderItem) => acc + orderItem.quantity,
+        0,
+      );
+
+      const order = await this.order.create({
+        data: {
+          totalAmount,
+          totalItems,
+          OrderItems: {
+            createMany: {
+              data: createOrderDto.items.map((orderItem) => ({
+                price: products.find((p) => p.id === orderItem.productId)
+                  ?.price,
+                productId: orderItem.productId,
+                quantity: orderItem.quantity,
+              })),
+            },
+          },
+        },
+        include: {
+          OrderItems: {
+            select: {
+              price: true,
+              quantity: true,
+              productId: true,
+            },
+          },
+        },
+      });
+
+      return {
+        ...order,
+        OrderItems: order.OrderItems.map((orderItem) => ({
+          ...orderItem,
+          name: products.find((p) => p.id === orderItem.productId)?.name,
+        })),
+      };
+    } catch (e) {
+      throw new RpcException({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Error at try create order',
+      });
+    }
   }
 
   async findAll(orderPaginationDto: OrderPaginationDto) {
